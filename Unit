@@ -1,0 +1,189 @@
+// Exmeple of Unit pathfinding code //
+
+    if (currentWaypoint > path.vectorPath.Count) return;
+
+		if (currentWaypoint == path.vectorPath.Count) {
+			owner.eventManager.CallChangeAnimation (transform.name, "Moving", false, Random.Range(0,3));
+			CancelPath ();
+			currentWaypoint++;
+			return;
+		}
+
+		if ((transform.position-path.vectorPath[currentWaypoint]).sqrMagnitude < nextWaypointDistance*nextWaypointDistance) {
+			antStep++;
+			currentWaypoint++;
+			return;
+		}
+
+		float _tempoSpeed = speed;
+		if (workingState == 15) {
+			_tempoSpeed = _tempoSpeed / (2 * GameManager.timeSpeed);
+		}
+		transform.position = Vector3.MoveTowards (transform.position, path.vectorPath[currentWaypoint], Time.deltaTime * _tempoSpeed);
+    
+    
+// Exemple of Unit Task Selection //
+
+if (dead || workingState != 0 || carryingState != 0) {
+			return null;
+		} 
+
+		GameObject _targetActionObject = null;
+		bool _gotTask = false;
+		bool _preventTask = false;
+		List<string> _possibleTasks = new List<string> ();
+		if (CheckHealth()) {
+			_possibleTasks.Add ("_hungrying");
+			_preventTask = true;
+		}
+
+		if (!_preventTask) {
+			if (retreating) {
+				_possibleTasks.Add ("_retreating");
+				_preventTask = true;
+			}
+		}
+
+		if (!_preventTask) {
+			if (canNurse) {
+				if (owner.CheckEggListCount () > 0) {
+					_possibleTasks.Add ("_eggWork");
+				}
+			}
+
+			if (canFeed) {
+				if (owner.GotAReplete () == true && owner.GetUnSotrredFoodCount () > 0) {
+					_possibleTasks.Add ("_feedWork");
+				}
+			}
+
+			if (canHarvest) {
+				FoodHolder _foodHolder = owner.DiscoveredFoodHolder ();
+				if (_foodHolder != null) {
+					if (_foodHolder.GotFoodPart()) {
+						_possibleTasks.Add ("_harvestingWork");
+					}
+				}
+			}
+
+			if (canDig) {
+				if (owner.CheckDirtListCount () > 0) {
+					_possibleTasks.Add ("_diggingWork");
+				}
+			}
+
+			if (canMite) {
+				if (GameManager.gameManager.activeMites.Count > 0) {
+					_possibleTasks.Add ("_miteWork");
+				}
+			}
+
+			if (canExplore) {
+				_possibleTasks.Add ("_exploreWork");
+			}
+			if (canPatrol) {
+				_possibleTasks.Add ("_patrolWork");
+			}
+		}
+
+		if (_possibleTasks.Count > 0) {
+			int _taskIndex = Random.Range (0, _possibleTasks.Count);
+			string _decidedTask = _possibleTasks [_taskIndex];
+			if (_decidedTask == "_eggWork") {
+				Unit _possibleEgg = owner.GetOwnerEgg ();
+				if (_possibleEgg != null) {
+					actionObject = _possibleEgg.gameObject;
+					owner.eventManager.CallPlayUnitSound (transform.name, null);
+					Physics.IgnoreCollision (GetMainCollider (),_possibleEgg.GetMainCollider (), false);
+					workingState = 1;
+					_gotTask = true;
+				} 
+			} 
+			else if (_decidedTask == "_feedWork") {
+				FoodPart _possibleFoodPart = owner.GetUnStorredFoodPart ();
+				if (_possibleFoodPart != null) {
+					actionObject = _possibleFoodPart.gameObject;
+					owner.eventManager.CallPlayUnitSound (transform.name, null);
+					workingState = 1;
+					_gotTask = true;
+				} 
+			} 
+			else if (_decidedTask == "_harvestingWork") {
+				FoodHolder _foodHolder = owner.DiscoveredFoodHolder ();
+				if (_foodHolder != null) {
+					FoodPart _tempoFood = _foodHolder.getFoodPart (owner);
+					if (_tempoFood != null) {
+						actionObject = _tempoFood.gameObject;
+						owner.eventManager.CallPlayUnitSound (transform.name, null);
+						workingState = 1;
+					}
+				} 
+			} 
+			else if (_decidedTask == "_diggingWork") {
+				DirtBlock _block = owner.GetUndiggedDirt ();
+				if (_block != null) {
+					actionObject = _block.gameObject;
+					_block.SetDiggerCollision(this, false);
+					workingState = 1;
+					_gotTask = true;
+				}
+			}
+			else if (_decidedTask == "_miteWork") {
+				Npc _possibleMite = GameManager.gameManager.activeMites [Random.Range (0, GameManager.gameManager.activeMites.Count)];
+				if (_possibleMite != null) {
+					actionObject = _possibleMite.gameObject;
+					_gotTask = true;
+					workingState = 1;
+				}
+			} 
+			else if (_decidedTask == "_exploreWork") {
+				_gotTask = true;
+				fakeActionObject.transform.position = UnitUndergroundExplore ();
+				actionObject = fakeActionObject;
+				workingState = 1;
+			}
+			else if (_decidedTask == "_patrolWork") {
+				_gotTask = true;
+				Vector3 _surroundingPatrolPos = owner.getPatrolingZone ().transform.position;
+				_surroundingPatrolPos.x = Random.Range (_surroundingPatrolPos.x - 5, _surroundingPatrolPos.x + 5);
+				_surroundingPatrolPos.z = Random.Range (_surroundingPatrolPos.z - 5, _surroundingPatrolPos.z + 5);
+				fakeActionObject.transform.position = _surroundingPatrolPos;
+				actionObject = fakeActionObject;
+				workingState = 1;
+			}
+			else if (_decidedTask == "_hungrying") {
+				Unit _feeder = owner.GetNearestReplete (this, true);
+
+				if (_feeder != null) {
+					actionObject = unitMouthObj;
+					Physics.IgnoreCollision (GetMainCollider (), _feeder.unitMouthCollider, false);
+					_gotTask = true;
+					workingState = 1;
+				} else {
+					if (owner.GetUnStorredFoodList ().Count > 0) {
+						FoodPart _tempoFood = owner.GetUnStorredFoodPart ();
+						if (_tempoFood != null) {
+							actionObject = _tempoFood.gameObject;
+							_gotTask = true;
+							workingState = 1;
+						}
+					} else if (owner.DiscoveredFoodHolderCount () > 0) {
+						FoodHolder _foodHolder = owner.DiscoveredFoodHolder ();
+						if (_foodHolder != null) {
+							FoodPart _tempoFood = foodHolder.getFoodPart (owner);
+							if (_tempoFood != null) {
+								actionObject = _tempoFood.gameObject;
+								_gotTask = true;
+								workingState = 1;
+							}
+						}
+					} 
+				}
+			}
+		} 
+
+		if(!_gotTask) {
+			Debug.Log ("nothing to do!");
+		}
+		return _targetActionObject;
+	}
