@@ -1,0 +1,241 @@
+// Exemple of the AI part of the units
+
+private IEnumerator UnitAi() {
+		while (true) {
+			yield return new WaitForSeconds (1);
+			if (dead) {
+				yield break;
+			}
+			if (!highlighted && !controlled) {
+				if (!moving && !isQueen && !developping) {
+					if (workingState == 0 && carryingState == 0) {
+						actionObject = null;
+						FindTaskToDo ();
+						if (actionObject != null) { 
+							ResetDistanceWayPoint (true);
+							SetActionObjectCollision (false);
+							workingState = 1;
+							CancelPath ();
+						} else {
+							SetDestination (UnitUndergroundExplore ());
+						}
+					} else {
+						if (carryingState == 0) {
+							if (workingState == 1) {
+								if (actionObject != null && !GetActionObjectHolding ()) {
+									SetWayPointDistance (actionObject);					
+									SetDestination (actionObject.transform.position);
+								} else {
+									ResetUnitAi ();
+								}
+							} 
+							if (workingState == 4) {
+								if (actionObject != null) {
+									AttackTarget ();
+								} else {
+									StopAttack ();
+									ResetUnitAi ();
+								}
+							}
+						} else {
+							if (workingState == 2) {
+								if (actionObject != null) {
+									FindActionObjectGoal ();
+									if (releaseObjectiveObj != null) {
+										workingState = 3;
+										SetActionReleaseObjectiveObjCollision (false);
+									} else {
+										Debug.Log ("WARNING 282 UNIT: cannot find ReleaseObj for = " + actionObject + " Unit:" + transform.name);
+									}
+								} else {
+									ResetUnitAi ();
+								}
+							}
+							if (workingState == 3) {
+								if (releaseObjectiveObj != null) {
+									SetWayPointDistance (releaseObjectiveObj);
+									SetDestination (releaseObjectiveObj.transform.position);
+								} else {
+									workingState = 2;
+								}
+							}
+						}
+					} 
+				}
+			}
+		} 
+	}
+  
+  private void FindTaskToDo() {
+		if (dead) {
+			return;
+		} 
+
+		ResetUnitAi ();
+		bool _gotTask = false;
+		bool _preventTask = false;
+		List<string> _possibleTasks = new List<string> ();
+
+		if (!_preventTask) {
+			if (CheckHealth ()) {
+				_possibleTasks.Add ("_hungrying");
+				_preventTask = true;
+			}
+		}
+
+		if (!_preventTask) {
+			if (retreating) {
+				_possibleTasks.Add ("_retreating");
+				_preventTask = true;
+			}
+		}
+
+		if (!_preventTask) {
+			if (unitTasks[0]) {
+				if (owner.CheckEggListCount () > 0) {
+					_possibleTasks.Add ("_nursingWork");
+				}
+			}
+			if (unitTasks[1]) {
+				FoodHolder _foodHolder = owner.DiscoveredFoodHolder ();
+				if (_foodHolder != null) {
+					if (_foodHolder.GotFoodPart()) {
+						_possibleTasks.Add ("_harvestingWork");
+					}
+				}
+			}
+			if (unitTasks[2]) {
+				if (owner.GotAReplete () == true && owner.GetUnSotrredFoodCount () > 0) {
+					_possibleTasks.Add ("_feedWork");
+				}
+			}
+
+			if (unitTasks[3]) {
+				if (owner.CheckDirtListCount () > 0) {
+					_possibleTasks.Add ("_diggingWork");
+				}
+			}
+
+			if (unitTasks[4]) {
+				if (GameManager.gameManager.activeMites.Count > 0) {
+					_possibleTasks.Add ("_miteWork");
+				}
+			}
+
+			if (unitTasks[5]) {
+				_possibleTasks.Add ("_exploreWork");
+			}
+
+			if (unitTasks[6]) {
+				if (owner.getPatrolingZoneCount () > 0) {
+					_possibleTasks.Add ("_patrolWork");
+				}
+			}
+			if (unitTasks [7]) {
+				if(owner.CheckTargetsCount() > 0) {
+					_possibleTasks.Add ("_attackWork");
+					_preventTask = true;
+				}
+			}
+		}
+
+		if (_possibleTasks.Count > 0) {
+			int _taskIndex = Random.Range (0, _possibleTasks.Count);
+			string _decidedTask = _possibleTasks [_taskIndex];
+			if (_decidedTask == "_nursingWork") {
+				Unit _possibleEgg = owner.GetOwnerEgg ();
+				if (_possibleEgg != null) {
+					actionObject = _possibleEgg.gameObject;
+					owner.eventManager.CallPlayUnitSound (transform.name, null);
+					_gotTask = true;
+				} 
+			} 
+			else if (_decidedTask == "_feedWork") {
+				FoodPart _possibleFoodPart = owner.GetUnStorredFoodPart ();
+				if (_possibleFoodPart != null) {
+					actionObject = _possibleFoodPart.gameObject;
+					owner.eventManager.CallPlayUnitSound (transform.name, null);
+					_gotTask = true;
+				} 
+			} 
+			else if (_decidedTask == "_harvestingWork") {
+				FoodHolder _foodHolder = owner.DiscoveredFoodHolder ();
+				if (_foodHolder != null) {
+					FoodPart _tempoFood = _foodHolder.getFoodPart (owner);
+					if (_tempoFood != null) {
+						actionObject = _tempoFood.gameObject;
+						owner.eventManager.CallPlayUnitSound (transform.name, null);
+					}
+				} 
+			} 
+			else if (_decidedTask == "_diggingWork") {
+				DirtBlock _block = owner.GetUndiggedDirt ();
+				if (_block != null) {
+					actionObject = _block.gameObject;
+					_block.SetDiggerCollision(this, false);
+					_gotTask = true;
+				}
+			}
+			else if (_decidedTask == "_miteWork") {
+				Npc _possibleMite = GameManager.gameManager.activeMites [Random.Range (0, GameManager.gameManager.activeMites.Count)];
+				if (_possibleMite != null) {
+					actionObject = _possibleMite.gameObject;
+					_gotTask = true;
+				}
+			} 
+			else if (_decidedTask == "_exploreWork") {
+				Pheromone _randomPheromone = owner.GetRandomPheromome ();
+				if (_randomPheromone != null) {
+					fakeActionObject.transform.position = RandomizeDestination (_randomPheromone.transform.position);
+				} else {
+					fakeActionObject.transform.position = RandomizeDestination (planeManager.GetColonyEntrancePos ());
+				}
+				actionObject = fakeActionObject;
+				StartCoroutine (ExploreReset());
+				_gotTask = true;
+			}
+			else if (_decidedTask == "_patrolWork") {
+				_gotTask = true;
+				Vector3 _surroundingPatrolPos = owner.getPatrolingZone ().transform.position;
+				_surroundingPatrolPos.x = Random.Range (_surroundingPatrolPos.x - 5, _surroundingPatrolPos.x + 5);
+				_surroundingPatrolPos.z = Random.Range (_surroundingPatrolPos.z - 5, _surroundingPatrolPos.z + 5);
+				fakeActionObject.transform.position = _surroundingPatrolPos;
+				actionObject = fakeActionObject;
+			}
+			else if (_decidedTask == "_attackWork") {
+				GameObject _target = owner.GetTarget (this);
+				if (_target != null) {
+					actionObject = _target;
+					_gotTask = true;
+				}
+			}
+			else if (_decidedTask == "_hungrying") {
+				Unit _feeder = owner.GetNearestReplete (this, true);
+				if (_feeder != null) {
+					actionObject = _feeder.unitMouthObj;
+					_gotTask = true;
+				} else {
+					if (owner.GetUnStorredFoodList ().Count > 0) {
+						FoodPart _tempoFood = owner.GetUnStorredFoodPart ();
+						if (_tempoFood != null) {
+							actionObject = _tempoFood.gameObject;
+							_gotTask = true;
+						}
+					} else if (owner.DiscoveredFoodHolderCount () > 0) {
+						FoodHolder _foodHolder = owner.DiscoveredFoodHolder ();
+						if (_foodHolder != null) {
+							FoodPart _tempoFood = _foodHolder.getFoodPart (owner);
+							if (_tempoFood != null) {
+								actionObject = _tempoFood.gameObject;
+								_gotTask = true;
+							}
+						}
+					} 
+				}
+			}
+		} 
+
+		if(!_gotTask) {
+			Debug.Log ("nothing to do!");
+		}
+	}
