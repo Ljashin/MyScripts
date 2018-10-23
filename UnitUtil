@@ -1,1 +1,60 @@
+//Returns a world position around the entrance of the colony entry hole
+	public Vector3 GetDropPoint() {
+		Vector3 _dropPoint = Vector3.zero;
 
+        //Looking from above, we want to find a flat circle around the entrance with a x and z
+		float _xDiameter = 7;
+		float _zDiameter = 7;
+		entranceZoneOffSet++;
+
+        //There can be multiple entry points for the colony. We will expand the circle diameter to enveloppe all colony entry holes
+		if (planeHoles.Count > 1) {
+			foreach (GameObject _entranceA in planeHoles) {
+				float _entranceAXpos = _entranceA.transform.position.x;
+				float _entranceAZpos = _entranceA.transform.position.z;
+
+				foreach (GameObject _entranceB in planeHoles) {
+					float _xDistance = Mathf.Abs (_entranceAXpos - _entranceB.transform.position.x) + entranceZoneOffSet;
+					float _zDistance = Mathf.Abs (_entranceAZpos - _entranceB.transform.position.z) + entranceZoneOffSet;
+
+					if (_xDistance > _xDiameter) {
+						_xDiameter = _xDistance;
+					}
+					if (_zDistance > _zDiameter) {
+						_zDiameter = _zDistance;
+					}
+				}
+			}
+		}
+			
+		Vector3 _averageEntrance = Vector3.zero;
+		foreach (GameObject _entrancePos in planeHoles) {
+			_averageEntrance += _entrancePos.transform.position;
+		}
+		_averageEntrance /= planeHoles.Count;
+
+        //Using the diameter, we can select a random point within the circle
+		int _randomAngle = Random.Range (0, 360);
+		float _randomXCPoint = _averageEntrance.x + ((_xDiameter + entranceZoneOffSet) / 2) * Mathf.Cos (_randomAngle);
+		float _randomZCPoint = _averageEntrance.z + ((_zDiameter + entranceZoneOffSet) / 2) * Mathf.Sin (_randomAngle);
+
+        //Once that we have a point, we will find a node of the pathfinding grid to send the unit drop the dirt block it digged.
+		RaycastHit _ray;
+		Vector3 _direction = (new Vector3 (_randomXCPoint, 22, _randomZCPoint) - new Vector3 (_randomXCPoint, 24, _randomZCPoint)).normalized;
+		if (Physics.Raycast (new Vector3 (_randomXCPoint, 24, _randomZCPoint), _direction, out _ray, 4)) {
+			if (_ray.transform.name.Contains ("Chunk") || _ray.transform.name.Contains ("Voxeland")) {
+				NNConstraint _pathConstraint = NNConstraint.Default;
+				GraphNode _node1 = AstarPath.active.GetNearest ( _ray.point, _pathConstraint).node;
+
+				if (_node1 != null) {
+					_dropPoint = (Vector3)_node1.position;
+				} 
+			}
+		}
+
+		if (entranceZoneOffSet > 15) {
+			entranceZoneOffSet = 5;
+		}
+
+		return _dropPoint;
+	}
