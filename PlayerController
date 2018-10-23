@@ -1,0 +1,138 @@
+// PART OF THE CODE USED TO CONTROL THE PLAYER IN RTS VIEW AND UNDERGROUND VIEW
+
+
+// THERE ARE TWO VIEWS IN RTS VIEW. WHEN YOU LOOK THE OUTSIDE WORLD FROM ABOVE AND WHEN YOU LOOK UNDERGROUND FROM THE SIDES
+// THE PLAYER USED THE MOUSE TO MOVE THE CAMERA OR THE BORDERS OF THE SCREEN OR THE KEYBOARD OR THE SCROLLINGWHEEL OF THE MOUSE
+
+// TOP VIEW "VIEWSTATE 1" IS THE TOP RTS 
+// UNDERGROUND VIEW "VIEWSTATE 2" IS THE UNDERGROUND VIEW
+
+private void MoveRTSView() {
+		if (fpsView || player.downCamTarget == null || player.topCamTarget == null) {
+			return;
+		}
+		if (allowPanning) {
+			if (player.viewState == 1) {
+				if (!Input.GetMouseButton (1)) {
+					Vector3 _translationDes = transform.position;
+					if (Input.GetKey (KeyCode.UpArrow) || Input.GetKey (KeyCode.W) || Input.mousePosition.y >= Screen.height - borderMouseDetection) {
+						_translationDes.z += cameraRotationSpeed * Time.deltaTime;
+					}
+
+					if (Input.GetKey (KeyCode.DownArrow) || Input.GetKey (KeyCode.S) || Input.mousePosition.y <= borderMouseDetection) {
+						_translationDes.z -= cameraRotationSpeed * Time.deltaTime;
+					}
+
+					if (Input.GetKey (KeyCode.RightArrow) || Input.GetKey (KeyCode.D) || Input.mousePosition.x >= Screen.width - borderMouseDetection) {
+						_translationDes.x += cameraRotationSpeed * Time.deltaTime;
+					}
+
+					if (Input.GetKey (KeyCode.LeftArrow) || Input.GetKey (KeyCode.A) || Input.mousePosition.x <= borderMouseDetection) {
+						_translationDes.x -= cameraRotationSpeed * Time.deltaTime;
+					}
+
+					float _mouseScrollValue = Input.GetAxis ("Mouse ScrollWheel");
+
+					if (Input.GetKey (KeyCode.Equals)) {
+						_translationDes.y -= cameraRotationSpeed * Time.deltaTime * zoomingSpeed;
+					}
+					if (_mouseScrollValue > 0) {
+						_translationDes.y -= cameraRotationSpeed * Time.deltaTime * zoomingSpeed;
+					}
+
+					if (Input.GetKey (KeyCode.Minus)) {
+						_translationDes.y += cameraRotationSpeed * Time.deltaTime * zoomingSpeed;
+					}
+					if (_mouseScrollValue < 0) {
+						_translationDes.y += cameraRotationSpeed * Time.deltaTime * zoomingSpeed;
+					}
+					if (canZoom) {
+						_translationDes.x = Mathf.Clamp (_translationDes.x, -95, 35);
+						_translationDes.y = Mathf.Clamp (_translationDes.y, 24, 70);
+						_translationDes.z = Mathf.Clamp (_translationDes.z, -80, 44);
+
+						if (Vector3.Distance (transform.position, player.topCamTarget.transform.position) > 3.5f) {
+							transform.position = _translationDes;
+						} else {
+							if (canZoom) {
+								StartCoroutine (ReAllowZooming ());
+								canZoom = false;
+							}
+						}
+					}
+				} else {
+					if (player.GetPlayerHighLightsCount () == 0) {
+						yTilt -= Input.GetAxis ("Mouse Y") * orbittingSpeed * 0.05f;
+						yTilt = Mathf.Clamp (yTilt, yMinAngle, yMaxAngle);
+						tiltRotation = Quaternion.Euler (yTilt, 0, 0);
+						Quaternion currentRotation = playerCam.transform.rotation;
+						Quaternion _rotation = Quaternion.Lerp (currentRotation, tiltRotation, Time.deltaTime);
+						playerCam.transform.rotation = _rotation;
+					}
+				}
+			} else {
+				if (canZoom && player.isUnderGround) {
+					if (Vector3.Distance (transform.position, player.downCamTarget.transform.position) <= 3.5f) {
+						StartCoroutine (ReAllowZooming ());
+						canZoom = false;
+					}
+				}
+
+				if (canZoom) {
+					Vector3 _currentPos = transform.position;
+
+					_currentPos.x = Mathf.Clamp (_currentPos.x, lowestXPos, highestXPos);
+					_currentPos.y = Mathf.Clamp (_currentPos.y, lowestGroundValue, 20f);
+					_currentPos.z = Mathf.Clamp (_currentPos.z, lowestZPos, highestZPos);
+
+					if (_currentPos.y >= 20) {
+						_currentPos.y = 19.9f;
+					} 
+
+					transform.position = _currentPos;
+
+					float _mouseScrollValue = Input.GetAxis ("Mouse ScrollWheel");
+									
+					if (_mouseScrollValue > 0 || Input.GetKey (KeyCode.Equals)) {
+						if (Input.GetKey (KeyCode.Equals)) {
+							transform.position = Vector3.MoveTowards (transform.position, player.downCamTarget.transform.position, Time.deltaTime* zoomingSpeed);
+						}
+						if (_mouseScrollValue > 0) {
+							transform.position = Vector3.MoveTowards (transform.position, player.downCamTarget.transform.position, Time.deltaTime* zoomingSpeed);
+						}
+					}
+					if (_mouseScrollValue < 0 || Input.GetKey (KeyCode.Minus)) {
+						if (Input.GetKey (KeyCode.Minus)) {
+							transform.position = Vector3.MoveTowards (transform.position, transform.position - transform.forward * 5, Time.deltaTime* zoomingSpeed);
+						}
+						if (_mouseScrollValue < 0) {
+							transform.position = Vector3.MoveTowards (transform.position, transform.position - transform.forward * 5, Time.deltaTime* zoomingSpeed);
+						}
+					}
+
+					if (Input.GetKey (KeyCode.A) || Input.GetKey (KeyCode.LeftArrow) || Input.mousePosition.x <= borderMouseDetection) {
+						transform.RotateAround (player.downCamTarget.transform.position, transform.up, Time.deltaTime* orbittingSpeed);
+					}
+
+					if (Input.GetKey (KeyCode.D) || Input.GetKey (KeyCode.RightArrow) || Input.mousePosition.x >= Screen.width - borderMouseDetection) {
+						transform.RotateAround (player.downCamTarget.transform.position, -transform.up, Time.deltaTime* orbittingSpeed);
+					}
+
+					if (Input.GetKey (KeyCode.W) || Input.GetKey (KeyCode.UpArrow) || Input.mousePosition.y >= Screen.height - borderMouseDetection) {
+						if (transform.localEulerAngles.x <= 87f || (transform.localEulerAngles.x >= 270 && transform.localEulerAngles.x <= 360)) {
+							transform.RotateAround (player.downCamTarget.transform.position, transform.right, Time.deltaTime* orbittingSpeed);
+						} 
+					} 
+					if (Input.GetKey (KeyCode.S) || Input.GetKey (KeyCode.DownArrow) || Input.mousePosition.y <= borderMouseDetection) {
+						if ((transform.localEulerAngles.x <= 360 && transform.localEulerAngles.x >= 276) || transform.localEulerAngles.x >= 0 && transform.localEulerAngles.x <= 88) {
+							if (GameManager.GetTunnelCount () == 0 && transform.position.y < 24) {
+								return;
+							}
+							transform.RotateAround (player.downCamTarget.transform.position, -transform.right, Time.deltaTime* orbittingSpeed);
+						}
+					} 
+				}
+				transform.LookAt (player.downCamTarget.transform.position);
+			}
+		}
+	}
