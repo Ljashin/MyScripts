@@ -1,0 +1,151 @@
+//PLAYER UI SCRIPT 
+private void SpawnUnit() {
+  //prevent actions when game is paused or not ready
+  if (Time.timeScale != 0) {
+    int _unitCost = 4;
+    int _unitSpace = unitsSpace[0];
+    bool _canLayEgg = false;
+
+    if (!canSpawn) {
+      return;
+    }
+
+    if (rapidSpawnBlocker) {
+      return;
+    }
+    //Game logic requiets atleast one ant being able to care for the brood
+    if (type == "Nurser") {
+      if (player.GetPlayerNurserCount() == 0 || player.GetNursingZoneCount () > 0) {
+        _unitCost = 3;
+        _unitSpace = unitsSpace [0];
+        _canLayEgg = true;
+      }
+    }
+    //A type is set with the UI system and check prerequiers before moving forward
+    if (player.GetPlayerNurserCount () >= 1 && player.GetNursingZoneCount () >= 1) {
+      if (type == "Worker") {
+        _unitCost = 6;
+        _unitSpace = unitsSpace [1];
+      } else if (type == "Digger") {
+        _unitCost = 12;
+        _unitSpace = unitsSpace [3];
+      } else if (type == "Replete") {
+        _unitCost = 18;
+        _unitSpace = unitsSpace [2];
+      } else if (type == "Soldier") {
+        _unitCost = 30;
+        _unitSpace = unitsSpace [4];
+      } else if (type == "SuperSoldier") {
+        _unitCost = 40;
+        _unitSpace = unitsSpace [5];
+      }
+
+      _canLayEgg = true;
+    } 
+
+    if(colour != 0) {
+      _unitCost += _unitCost/2;
+    }
+
+    //The information is then sent to the EventManager that deals with online/offline mechanics
+    //If the player has enough food and space in the colony the event is started
+    if (_canLayEgg) {
+      Unit _foodGiver = GetSpawningFoodGiver (_unitCost);
+      if (_foodGiver != null && colonyPool + _unitSpace <= MaxColonyPool) {
+        player.eventManager.CallSpawnUnit (type, colour, transform.name, queenSpawnPoint.position);
+        player.eventManager.CallModifyPoolData (player.transform.name, _unitSpace, false);
+        player.eventManager.CallModifyFood (_foodGiver.transform.name, _unitCost, true);
+        player.eventManager.CallPlayUnitSound (queen.transform.name, "SpawnEgg");
+        for (int i = 0; i < spawnPanelAnimIcons.Length; i++) {
+          spawnPanelAnimIcons [i].SetActive (true);
+        }
+        spawnPanelAnimator.SetBool ("SpawnIcons", true);
+        StartCoroutine (ResetSPawnAnimation ());
+      } else {
+        if (_foodGiver == null) {
+          ChangeAlertPanelState ("NotEnoughFood");
+        }
+        if (colonyPool + _unitSpace > MaxColonyPool) {
+          ChangeAlertPanelState ("NotEnoughSpace");
+        }
+      }
+    } else {
+      if (player.GetNursingZoneCount () == 0) {
+        ChangeAlertPanelState ("NoNursingZone");
+      }
+    }
+  }
+}
+
+
+
+
+//EVENT MANAGER PART OF CODE FOR SPAWNING
+
+//This can only be cast from local player or solo player
+public void CallSpawnUnit(string _unitName, int _colourType, string _playerID, Vector3 _spawnPoint) {
+  if (GameManager.vsGame) {
+    OnlineCallSpawnUnit (_unitName, _colourType, _playerID, _spawnPoint);
+  } else {
+    OffLineSpawnUnit (_unitName, _colourType, _playerID, _spawnPoint);
+  }
+}
+
+//IN VS Mode, the client calls creating a unit
+[Client]
+public void OnlineCallSpawnUnit(string _unitName, int _colourType, string _playerID, Vector3 _spawnPoint) {
+  CmdSpawnUnit (_unitName, _colourType, _playerID, _spawnPoint);
+}
+
+//Information is sent to the Server/Host
+[Command]
+private void CmdSpawnUnit(string _unitName, int _colourType, string _playerID, Vector3 _spawnPoint) {
+  if (_spawnPoint == Vector3.zero) {
+    return;
+  }
+  GameObject _unit = null;
+  GameObject _food = null;
+
+  bool isUnit = false;
+  bool isFood = false;
+
+  switch (_unitName) {
+
+  case "Queen":
+    _unit = Instantiate (queen);
+    isUnit = true;
+    break;
+
+  case "Nurser":
+    _unit = Instantiate (nurser);
+    isUnit = true;
+    break;
+
+  case "Worker":
+    _unit = Instantiate (worker);
+    isUnit = true;
+    break;
+
+  //....
+
+  }
+
+  if (!isFood) {
+    _unit.transform.position = _spawnPoint;
+    if (isUnit) {
+      Player _player = GameManager.GetPlayer (_playerID);
+      NetworkServer.SpawnWithClientAuthority (_unit, _player.gameObject);
+      _unit.GetComponent<Unit> ().colourType = _colourType;
+    } else {
+      if (_unitName == "Mite") {
+        Player _player = GameManager.GetPlayer (_playerID);
+        NetworkServer.SpawnWithClientAuthority (_unit, _player.gameObject);
+      } else {
+        NetworkServer.Spawn (_unit);
+      }
+    }
+  } else {
+    _food.transform.position = _spawnPoint;
+    NetworkServer.Spawn (_food.gameObject);
+  }
+}
