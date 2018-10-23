@@ -1,58 +1,59 @@
+// THIS FUNCTION WAS CREATED TO SEE IF THE ENTRANCE OF THE COLONY PATHFINDING GRAPH IS LINKED TO THE UNDERGROUND COLONY GRAPH
+// IT FIRST FINDS A HOLE
+// GETS THE DIRECTION DOWN FROM THE ENTRANCE
+// LAUNCHES A RAY TO FIND THE FLOOR OF THE UNDERGROUND COLONY
+// LAUNCHES 4 RAYS IN ALL DIRECTONS OF X AND Z
+// FIND THE NODES OF THE 4 RAYS
+// MANUALLY LINKS THE NODES TO THE TOP GRID 
+// UNITS CAN NOW WALK BETWEEN UNLINKED GRAPHS
+
 public void CheckUnconnectedGraphs() {
-		checkingConnection = true;
-		SetHolesColliderState (false);
-		NNConstraint _pathConstraint = NNConstraint.Default;
+	checkingConnection = true;
+	SetHolesColliderState (false);
+	NNConstraint _pathConstraint = NNConstraint.Default;
 
-		if (planeHoles.Count > 0) {
-			foreach (GameObject _entrance in planeHoles) {
-				GraphNode _downCenterNode = null;
+	if (planeHoles.Count > 0) {
+		foreach (GameObject _entrance in planeHoles) {
+			GraphNode _downCenterNode = null;
 
-				Vector3 _entrancePos = _entrance.transform.position;
-				Vector3 _entranceDownDir = (new Vector3(_entrance.transform.position.x,_entrance.transform.position.y - 10,_entrance.transform.position.z) - _entrance.transform.position).normalized;
+			Vector3 _entrancePos = _entrance.transform.position;
+			Vector3 _entranceDownDir = (new Vector3(_entrance.transform.position.x,_entrance.transform.position.y - 10,_entrance.transform.position.z) - _entrance.transform.position).normalized;
 
-				Vector3 _downEntranceHit = _entrancePos;
-				_downEntranceHit.y -= 10;
+			Vector3 _downEntranceHit = _entrancePos;
+			_downEntranceHit.y -= 10;
 
-				RaycastHit _entranceDownHit;
-				if (Physics.Raycast (_entrancePos, _entranceDownDir, out _entranceDownHit, 20, entranceConnectionLayer )) {
-					if (_entranceDownHit.transform.name.Contains ("Chunk") || _entranceDownHit.transform.name.Contains ("Voxeland")) {
-						_downEntranceHit = _entranceDownHit.point;
-						_downCenterNode = AstarPath.active.GetNearest ( _downEntranceHit, _pathConstraint).node;
+			RaycastHit _entranceDownHit;
+			if (Physics.Raycast (_entrancePos, _entranceDownDir, out _entranceDownHit, 20, entranceConnectionLayer )) {
+				if (_entranceDownHit.transform.name.Contains ("Chunk") || _entranceDownHit.transform.name.Contains ("Voxeland")) {
+					_downEntranceHit = _entranceDownHit.point;
+					_downCenterNode = AstarPath.active.GetNearest ( _downEntranceHit, _pathConstraint).node;
 
+					for (int i = 0; i < 4; i++) {
+						RaycastHit _sideRay;
+						Vector3 _direction = Vector3.zero;
 
-						for (int i = 0; i < 4; i++) {
-							RaycastHit _sideRay;
-							Vector3 _direction = Vector3.zero;
-
-							if (i == 0) {
-								_direction = Vector3.left; 
-							} else if (i == 1) {
-								_direction = Vector3.right; 
-							}  else if (i == 2) {
-								_direction = Vector3.forward; 
-							}  else if (i == 3) {
-								_direction = -Vector3.forward; 
-							}
-							if (Physics.Raycast (_entrancePos, _direction, out _sideRay, 20, entranceConnectionLayer)) {
-								if (_sideRay.transform.name.Contains ("Chunk") || _sideRay.transform.name.Contains ("Voxeland")) {
-									//							GameObject _sphere2 = GameObject.CreatePrimitive (PrimitiveType.Sphere);
-									//							_sphere2.transform.localScale = new Vector3 (0.5f, 0.5f, 0.5f);
-									//							_sphere2.transform.position = _sideRay.point;
-									//							_sphere2.GetComponent<MeshRenderer> ().material.color = Color.clear;
-									//							StartCoroutine (DeletePrimitive (_sphere2));
-
-									GraphNode _node1 = AstarPath.active.GetNearest ( _sideRay.point, _pathConstraint).node;
-									if (_node1 != null) {
-										var _cost = (uint)((_node1.position - _downCenterNode.position).costMagnitude);
-										_downCenterNode.AddConnection (_node1, _cost);
-										_node1.AddConnection (_downCenterNode, _cost);
-										localPlayer.diggingSphere.transform.position = _entrancePos;
-										Bounds _bounds = localPlayer.diggingSphere.GetComponent<MeshRenderer> ().bounds;
-										_bounds.Expand (4);
-										GraphUpdateObject _sphereMesh = new GraphUpdateObject (_bounds);
-										AstarPath.active.UpdateGraphs (_sphereMesh);
-										localPlayer.diggingSphere.transform.position = Vector3.zero;
-									}
+						if (i == 0) {
+							_direction = Vector3.left; 
+						} else if (i == 1) {
+							_direction = Vector3.right; 
+						}  else if (i == 2) {
+							_direction = Vector3.forward; 
+						}  else if (i == 3) {
+							_direction = -Vector3.forward; 
+						}
+						if (Physics.Raycast (_entrancePos, _direction, out _sideRay, 20, entranceConnectionLayer)) {
+							if (_sideRay.transform.name.Contains ("Chunk") || _sideRay.transform.name.Contains ("Voxeland")) {
+								GraphNode _node1 = AstarPath.active.GetNearest ( _sideRay.point, _pathConstraint).node;
+								if (_node1 != null) {
+									var _cost = (uint)((_node1.position - _downCenterNode.position).costMagnitude);
+									_downCenterNode.AddConnection (_node1, _cost);
+									_node1.AddConnection (_downCenterNode, _cost);
+									localPlayer.diggingSphere.transform.position = _entrancePos;
+									Bounds _bounds = localPlayer.diggingSphere.GetComponent<MeshRenderer> ().bounds;
+									_bounds.Expand (4);
+									GraphUpdateObject _sphereMesh = new GraphUpdateObject (_bounds);
+									AstarPath.active.UpdateGraphs (_sphereMesh);
+									localPlayer.diggingSphere.transform.position = Vector3.zero;
 								}
 							}
 						}
@@ -60,5 +61,7 @@ public void CheckUnconnectedGraphs() {
 				}
 			}
 		}
-		SetHolesColliderState (true);
-		checkingConnection = false;
+	}
+	SetHolesColliderState (true);
+	checkingConnection = false;
+}
